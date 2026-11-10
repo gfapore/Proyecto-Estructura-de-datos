@@ -1,0 +1,58 @@
+//Arista 
+package urbanroute.estructuras;
+public class arista {
+private final string destino;
+private double tiempo;
+public arista(String destino,double tiempo) {
+this.destino = destino; 
+this.tiempo = tiempo;
+}
+public String gesDestino() {
+return destino;
+}
+public double getTiempo() {
+return tiempo;
+}
+public void setTiempo(doble tiempo)}
+this.tiempo = tiempo;
+}
+} 
+
+//cola 
+package urbanroute.estructuras; 
+public class Cola<T> {
+private nodo<T> frente; 
+private nodo<T? fin; 
+private int tamano;
+public void encolar(T dato) }
+Nodo<T> nuevo = new Nodo<> (dato);
+if (fin == null) { 
+frente = nuevo; 
+} else { 
+fin.setSiguiente(nuevo);
+}
+fin = nuevo;
+tamano++; 
+}
+public T desencolar() { 
+if (frente == null) {
+throw new IllegalStateException("La cola está vacía.");
+}
+T dato = frente.getDato();
+frente = frente.getSiguiente();
+if (frente == null) { 
+fin = null; 
+} 
+tamano--; 
+return dato; 
+} 
+
+public boolean estaVacia() { 
+return tamano == 0; 
+}
+public int tamano() {
+return tamano;
+}
+} 
+
+//ColaPriodridad 
