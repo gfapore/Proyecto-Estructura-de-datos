@@ -1,0 +1,215 @@
+// ===== modelo/Estacion.java =====
+package urbanroute.modelo;
+public class Estacion {
+public static final String LINEA_DESCONOCIDA = "Sin línea";
+public static final String ZONA_DESCONOCIDA = "Sin zona";
+private final String id;
+private final String nombre;
+private final String linea;
+private final String zona;
+private final int capacidadPasajerosHora;
+public Estacion(String id, String nombre, String linea, String zona, int capacidadPasajerosHora) {
+this.id = id;
+this.nombre = nombre;
+this.linea = linea;
+this.zona = zona;
+this.capacidadPasajerosHora = Math.max(0, capacidadPasajerosHora);
+}
+public static Estacion crearGenerica(String id) {
+return new Estacion(id, id, LINEA_DESCONOCIDA, ZONA_DESCONOCIDA, 0);
+}
+public String getId() {
+return id;
+}
+public String getNombre() {
+return nombre;
+}
+public String getLinea() {
+return linea;
+}
+public String getZona() {
+return zona;
+}
+public int getCapacidadPasajerosHora() {
+return capacidadPasajerosHora;
+}
+@Override
+public String toString() {
+return nombre.equals(id) ? id : id + " - " + nombre;
+}
+@Override
+public boolean equals(Object otro) {
+return otro instanceof Estacion && ((Estacion) otro).id.equals(id);
+}
+@Override
+public int hashCode() {
+return id.hashCode();
+}
+}
+// ===== modelo/Formato.java (38 líneas) =====
+package urbanroute.modelo;
+public final class Formato {
+private Formato() {
+}
+public static String minutos(double minutos) {
+double redondeado = Math.round(minutos * 100) / 100.0;
+if (redondeado == Math.rint(redondeado)) {
+return String.valueOf((long) redondeado);
+}
+return String.valueOf(redondeado);
+}
+public static String html(String texto) {
+if (texto == null) {
+return "";
+}
+StringBuilder sb = new StringBuilder(texto.length());
+for (int i = 0; i < texto.length(); i++) {
+char c = texto.charAt(i);
+switch (c) {
+case '<':
+sb.append("&lt;");
+break;
+case '>':
+sb.append("&gt;");
+break;
+case '&':
+sb.append("&amp;");
+break;
+case '"':
+sb.append("&quot;");
+break;
+default:
+sb.append(c);
+}
+}
+return sb.toString();
+}
+}
+// ===== modelo/RedTransporte.java (127 líneas) =====
+package urbanroute.modelo;
+import urbanroute.estructuras.Arista;
+import urbanroute.estructuras.Grafo;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.estructuras.Nodo;
+import urbanroute.estructuras.Ordenamiento;
+import urbanroute.estructuras.TablaHash;
+public class RedTransporte {
+private final Grafo grafo = new Grafo();
+private final TablaHash<Estacion> estacionesPorId = new TablaHash<>();
+private final TablaHash<Estacion> estacionesPorNombre = new TablaHash<>();
+public boolean agregarEstacion(Estacion estacion) {
+if (estacion == null || estacionesPorId.contiene(estacion.getId())) {
+return false;
+}
+estacionesPorId.insertar(estacion.getId(), estacion);
+String claveNombre = normalizar(estacion.getNombre());
+if (!estacionesPorNombre.contiene(claveNombre)) {
+estacionesPorNombre.insertar(claveNombre, estacion);
+}
+grafo.agregarVertice(estacion.getId());
+return true;
+}
+public Estacion eliminarEstacion(String id) {
+Estacion estacion = estacionesPorId.eliminar(id);
+if (estacion == null) {
+return null;
+}
+String claveNombre = normalizar(estacion.getNombre());
+if (estacionesPorNombre.obtener(claveNombre) == estacion) {
+estacionesPorNombre.eliminar(claveNombre);
+}
+grafo.eliminarVertice(id);
+return estacion;
+}
+public boolean agregarConexion(String origen, String destino, double tiempo) {
+if (!estacionesPorId.contiene(origen)) {
+throw new IllegalArgumentException("La estación \"" + origen + "\" no existe.");
+}
+if (!estacionesPorId.contiene(destino)) {
+throw new IllegalArgumentException("La estación \"" + destino + "\" no existe.");
+}
+return grafo.agregarArista(origen, destino, tiempo);
+}
+public boolean eliminarConexion(String origen, String destino) {
+return grafo.eliminarArista(origen, destino);
+}
+public Estacion obtenerEstacion(String id) {
+return estacionesPorId.obtener(id);
+}
+public Estacion buscarEstacion(String texto) {
+if (texto == null || texto.trim().isEmpty()) {
+return null;
+}
+String limpio = texto.trim();
+Estacion encontrada = estacionesPorId.obtener(limpio);
+if (encontrada == null) {
+encontrada = estacionesPorId.obtener(limpio.toUpperCase());
+}
+if (encontrada == null) {
+encontrada = estacionesPorNombre.obtener(normalizar(limpio));
+}
+return encontrada;
+}
+public boolean existeId(String id) {
+return estacionesPorId.contiene(id);
+}
+public boolean existeNombre(String nombre) {
+return estacionesPorNombre.contiene(normalizar(nombre));
+}
+public Estacion[] obtenerEstaciones() {
+String[] ids = grafo.obtenerVertices();
+Estacion[] resultado = new Estacion[ids.length];
+for (int i = 0; i < ids.length; i++) {
+resultado[i] = estacionesPorId.obtener(ids[i]);
+}
+return resultado;
+}
+public Estacion[] obtenerEstacionesOrdenadas() {
+Estacion[] resultado = obtenerEstaciones();
+Ordenamiento.mergeSort(resultado, (a, b) -> a.getId().compareToIgnoreCase(b.getId()));
+return resultado;
+}
+public String[] obtenerLineas() {
+TablaHash<Boolean> vistas = new TablaHash<>();
+for (Estacion e : obtenerEstaciones()) {
+vistas.insertar(e.getLinea(), Boolean.TRUE);
+}
+String[] lineas = vistas.claves();
+Ordenamiento.mergeSort(lineas, String::compareToIgnoreCase);
+return lineas;
+}
+public String[] obtenerZonas() {
+TablaHash<Boolean> vistas = new TablaHash<>();
+for (Estacion e : obtenerEstaciones()) {
+vistas.insertar(e.getZona(), Boolean.TRUE);
+}
+String[] zonas = vistas.claves();
+Ordenamiento.mergeSort(zonas, String::compareToIgnoreCase);
+return zonas;
+}
+public ListaEnlazada<Estacion> obtenerVecinas(String id) {
+ListaEnlazada<Estacion> vecinas = new ListaEnlazada<>();
+for (Nodo<Arista> n = grafo.obtenerAdyacentes(id).getCabeza(); n != null; n = n.getSiguiente()) {
+Estacion e = estacionesPorId.obtener(n.getDato().getDestino());
+if (e != null) {
+vecinas.agregar(e);
+}
+}
+return vecinas;
+}
+public int getNumEstaciones() {
+return estacionesPorId.tamano();
+}
+public int getNumConexiones() {
+return grafo.getNumAristas();
+}
+public Grafo getGrafo() {
+return grafo;
+}
+public TablaHash<Estacion> getIndiceEstaciones() {
+return estacionesPorId;
+}
+public static String normalizar(String texto) {
+return texto == null ? "" : texto.trim().toLowerCase();
+}
+}
