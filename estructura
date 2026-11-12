@@ -56,3 +56,113 @@ return tamano;
 } 
 
 //ColaPriodridad 
+package urbanroute.estructuras;
+public class ColaPrioridad {
+private static final int CAPACIDAD_INICIAL = 16;
+private String[] claves;
+private double [] prioridades;
+private int tamano;
+public ColaPrioridad() { 
+claves = new double[CAPACIDAD_INICIAL]
+prioridades = new double[CAPACIDAD_INICIAL];
+}
+public void insertar(String clave, double prioridad) {
+if (tamano == claves.length) {
+crecer();
+}
+claves[tamano] = clave;
+prioridades[tamano] = prioridad;
+flotar(tamano);
+tamano++;
+}
+public double prioridadMinima() {
+if (tamano == 0) {
+throw new IllegalStateException("La cola de prioridad está vacía.");
+}
+return prioridades[0];
+}
+public String extraerMinimo() {
+if (tamano == 0) {
+throw new IllegalStateException("La cola de prioridad está vacía.");
+}
+String minimo = claves[0];
+tamano--;
+claves[0] = claves[tamano];
+prioridades[0] = prioridades[tamano];
+claves[tamano] = null;
+hundir(0);
+return minimo;
+}
+public boolean estaVacia() {
+return tamano == 0;
+}
+private void flotar(int i) {
+while (i > 0) {
+int padre = (i - 1) / 2;
+if (prioridades[i] >= prioridades[padre]) {
+break;
+}
+intercambiar(i, padre);
+i = padre;
+}
+}
+private void hundir(int i) {
+while (true) {
+int izquierdo = 2 * i + 1;
+int derecho = izquierdo + 1;
+int menor = i;
+if (izquierdo < tamano && prioridades[izquierdo] < prioridades[menor]) {
+menor = izquierdo;
+}
+if (derecho < tamano && prioridades[derecho] < prioridades[menor]) {
+menor = derecho;
+}
+if (menor == i) {
+return;
+}
+intercambiar(i, menor);
+i = menor;
+}
+}
+private void intercambiar(int a, int b) {
+String c = claves[a];
+claves[a] = claves[b];
+claves[b] = c;
+double p = prioridades[a];
+prioridades[a] = prioridades[b];
+prioridades[b] = p;
+}
+private void crecer() {
+String[] nuevasClaves = new String[claves.length * 2];
+double[] nuevasPrioridades = new double[prioridades.length * 2];
+for (int i = 0; i < tamano; i++) {
+nuevasClaves[i] = claves[i];
+nuevasPrioridades[i] = prioridades[i];
+}
+claves = nuevasClaves;
+prioridades = nuevasPrioridades;
+}
+}
+
+//comparador 
+package urbanroute.estructuras;
+@FunvtionalInterface
+public interface Comparador<T> {
+boolean cumple(T elemento);
+}
+
+//conexion 
+package urbanroute.estructuras
+public class conexion {
+private final String origen;
+private final String destino; 
+privte final double tiempo;
+public conexion (string origen, String destino, double tiempo) {
+this.origen = origen;
+this.destino = destino 
+this.timepo = tiempo 
+} 
+public String getOrigen 
+return origen;
+}
+public String getDestino() { 
