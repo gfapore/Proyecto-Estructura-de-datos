@@ -1,0 +1,202 @@
+// ===== persistencia/GestorArchivo.java =====
+package urbanroute.persistencia;
+import java.io.File;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.Charset;
+import java.nio.charset.CodingErrorAction;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import urbanroute.estructuras.Conexion;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.estructuras.Nodo;
+import urbanroute.modelo.Estacion;
+import urbanroute.modelo.Formato;
+import urbanroute.modelo.RedTransporte;
+public class GestorArchivo {
+public static final String ENCABEZADO_ESTACIONES = "ID_Estacion,Nombre,Linea,Zona,Capacidad_Pasajeros_Hora";
+public static final String ENCABEZADO_CONEXIONES = "Estacion_Origen,Estacion_Destino,Tiempo_Minutos";
+public ResultadoCarga cargar(File archivo) throws IOException {
+if (archivo == null || !archivo.isFile()) {
+throw new IOException("El archivo seleccionado no existe o no es un archivo válido.");
+}
+String[] lineas = leerTexto(archivo).split("\\r\\n|\\n|\\r");
+RedTransporte red = new RedTransporte();
+ListaEnlazada<String> advertencias = new ListaEnlazada<>();
+ListaEnlazada<String[]> filasConexion = new ListaEnlazada<>();
+ListaEnlazada<Integer> numerosLinea = new ListaEnlazada<>();
+for (int i = 0; i < lineas.length; i++) {
+String linea = lineas[i].trim();
+if (linea.isEmpty() || linea.startsWith("#")) {
+continue;
+}
+String[] campos = dividir(linea);
+if (esEncabezado(campos)) {
+continue;
+}
+int numero = i + 1;
+if (campos.length == 5) {
+procesarEstacion(red, campos, numero, advertencias);
+} else if (campos.length == 3) {
+filasConexion.agregar(campos);
+numerosLinea.agregar(numero);
+} else {
+advertencias.agregar("Línea " + numero + ": se esperaban 3 o 5 columnas y hay " + campos.length + ".");
+}
+}
+Nodo<Integer> numero = numerosLinea.getCabeza();
+for (Nodo<String[]> n = filasConexion.getCabeza(); n != null; n = n.getSiguiente(), numero = numero.getSiguiente()) {
+procesarConexion(red, n.getDato(), numero.getDato(), advertencias);
+}
+if (red.getNumEstaciones() == 0) {
+throw new IOException("El archivo no contiene estaciones ni conexiones con un formato válido.\n"
++ "Formato esperado: Estacion_Origen,Estacion_Destino,Tiempo_Minutos");
+}
+return new ResultadoCarga(red, advertencias);
+}
+public void guardar(RedTransporte red, File archivo) throws IOException {
+StringBuilder sb = new StringBuilder();
+sb.append(ENCABEZADO_ESTACIONES).append('\n');
+for (Estacion e : red.obtenerEstaciones()) {
+sb.append(limpiar(e.getId())).append(',')
+.append(limpiar(e.getNombre())).append(',')
+.append(limpiar(e.getLinea())).append(',')
+.append(limpiar(e.getZona())).append(',')
+.append(e.getCapacidadPasajerosHora()).append('\n');
+}
+sb.append('\n').append(ENCABEZADO_CONEXIONES).append('\n');
+for (Nodo<Conexion> n = red.getGrafo().obtenerConexiones().getCabeza(); n != null; n = n.getSiguiente()) {
+Conexion c = n.getDato();
+sb.append(limpiar(c.getOrigen())).append(',')
+.append(limpiar(c.getDestino())).append(',')
+.append(Formato.minutos(c.getTiempo())).append('\n');
+}
+Path destino = archivo.toPath().toAbsolutePath();
+Path carpeta = destino.getParent();
+if (carpeta != null) {
+Files.createDirectories(carpeta);
+}
+Path temporal = Files.createTempFile(carpeta, "urbanroute", ".tmp");
+try {
+Files.write(temporal, sb.toString().getBytes(StandardCharsets.UTF_8));
+Files.move(temporal, destino, StandardCopyOption.REPLACE_EXISTING);
+} finally {
+Files.deleteIfExists(temporal);
+}
+}
+private void procesarEstacion(RedTransporte red, String[] c, int numero, ListaEnlazada<String> advertencias) {
+String id = c[0];
+if (id.isEmpty()) {
+advertencias.agregar("Línea " + numero + ": estación sin ID; se omitió.");
+return;
+}
+int capacidad = 0;
+if (!c[4].isEmpty()) {
+try {
+capacidad = Integer.parseInt(c[4]);
+if (capacidad < 0) {
+throw new NumberFormatException();
+}
+} catch (NumberFormatException ex) {
+advertencias.agregar("Línea " + numero + ": capacidad \"" + c[4] + "\" inválida; se usó 0.");
+capacidad = 0;
+}
+}
+String nombre = c[1].isEmpty() ? id : c[1];
+String linea = c[2].isEmpty() ? Estacion.LINEA_DESCONOCIDA : c[2];
+String zona = c[3].isEmpty() ? Estacion.ZONA_DESCONOCIDA : c[3];
+if (!red.agregarEstacion(new Estacion(id, nombre, linea, zona, capacidad))) {
+advertencias.agregar("Línea " + numero + ": la estación " + id + " está repetida; se conservó la primera.");
+}
+}
+private void procesarConexion(RedTransporte red, String[] c, int numero, ListaEnlazada<String> advertencias) {
+String origen = c[0];
+String destino = c[1];
+if (origen.isEmpty() || destino.isEmpty()) {
+advertencias.agregar("Línea " + numero + ": conexión sin origen o destino; se omitió.");
+return;
+}
+if (origen.equals(destino)) {
+advertencias.agregar("Línea " + numero + ": " + origen + " no puede conectarse consigo misma; se omitió.");
+return;
+}
+double tiempo;
+try {
+tiempo = Double.parseDouble(c[2]);
+} catch (NumberFormatException ex) {
+advertencias.agregar("Línea " + numero + ": tiempo \"" + c[2] + "\" no numérico; se omitió.");
+return;
+}
+if (!(tiempo > 0) || Double.isInfinite(tiempo)) {
+advertencias.agregar("Línea " + numero + ": el tiempo debe ser mayor que 0; se omitió.");
+return;
+}
+if (!red.existeId(origen)) {
+red.agregarEstacion(Estacion.crearGenerica(origen));
+}
+if (!red.existeId(destino)) {
+red.agregarEstacion(Estacion.crearGenerica(destino));
+}
+if (!red.agregarConexion(origen, destino, tiempo)) {
+advertencias.agregar("Línea " + numero + ": conexión " + origen + "-" + destino
++ " repetida; se usó el último tiempo (" + Formato.minutos(tiempo) + " min).");
+}
+}
+private static String[] dividir(String linea) {
+String[] partes = linea.split(",", -1);
+int largo = partes.length;
+while (largo > 1 && partes[largo - 1].trim().isEmpty()) {
+largo--;
+}
+String[] campos = new String[largo];
+for (int i = 0; i < largo; i++) {
+campos[i] = partes[i].trim();
+}
+return campos;
+}
+private static boolean esEncabezado(String[] campos) {
+String primero = campos[0].toLowerCase();
+return primero.startsWith("id_estacion") || primero.startsWith("estacion_origen")
+|| primero.equals("origen") || primero.equals("id");
+}
+private static String limpiar(String texto) {
+return texto.replace(',', ' ').replace('\n', ' ').replace('\r', ' ').trim();
+}
+private static String leerTexto(File archivo) throws IOException {
+byte[] bytes = Files.readAllBytes(archivo.toPath());
+int inicio = 0;
+if (bytes.length >= 3 && (bytes[0] & 0xFF) == 0xEF && (bytes[1] & 0xFF) == 0xBB && (bytes[2] & 0xFF) == 0xBF) {
+inicio = 3;
+}
+ByteBuffer buffer = ByteBuffer.wrap(bytes, inicio, bytes.length - inicio);
+try {
+return StandardCharsets.UTF_8.newDecoder()
+.onMalformedInput(CodingErrorAction.REPORT)
+.onUnmappableCharacter(CodingErrorAction.REPORT)
+.decode(buffer).toString();
+} catch (CharacterCodingException ex) {
+return new String(bytes, inicio, bytes.length - inicio, Charset.forName("windows-1252"));
+}
+}
+}
+// ===== persistencia/ResultadoCarga.java =====
+package urbanroute.persistencia;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.modelo.RedTransporte;
+public class ResultadoCarga {
+private final RedTransporte red;
+private final ListaEnlazada<String> advertencias;
+ResultadoCarga(RedTransporte red, ListaEnlazada<String> advertencias) {
+this.red = red;
+this.advertencias = advertencias;
+}
+public RedTransporte getRed() {
+return red;
+}
+public ListaEnlazada<String> getAdvertencias() {
+return advertencias;
+}
+}
