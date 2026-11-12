@@ -1,0 +1,226 @@
+// ===== algoritmos/AnalizadorRed.java (129 líneas) =====
+package urbanroute.algoritmos;
+import urbanroute.estructuras.Arista;
+import urbanroute.estructuras.Cola;
+import urbanroute.estructuras.ColaPrioridad;
+import urbanroute.estructuras.Grafo;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.estructuras.Nodo;
+import urbanroute.estructuras.Ordenamiento;
+import urbanroute.estructuras.TablaHash;
+public final class AnalizadorRed {
+private AnalizadorRed() {
+}
+public static ResultadoSubredes detectarSubredes(Grafo grafo) {
+return detectarSubredes(grafo, null);
+}
+public static ResultadoSubredes detectarSubredes(Grafo grafo, String excluida) {
+ResultadoSubredes resultado = new ResultadoSubredes();
+TablaHash<Boolean> visitados = new TablaHash<>(grafo.getNumVertices() * 2 + 1);
+for (String inicio : grafo.obtenerVertices()) {
+if (inicio.equals(excluida) || visitados.contiene(inicio)) {
+continue;
+}
+ListaEnlazada<String> subred = new ListaEnlazada<>();
+Cola<String> cola = new Cola<>();
+cola.encolar(inicio);
+visitados.insertar(inicio, Boolean.TRUE);
+while (!cola.estaVacia()) {
+String actual = cola.desencolar();
+subred.agregar(actual);
+for (Nodo<Arista> n = grafo.obtenerAdyacentes(actual).getCabeza(); n != null; n = n.getSiguiente()) {
+String vecino = n.getDato().getDestino();
+if (!vecino.equals(excluida) && !visitados.contiene(vecino)) {
+visitados.insertar(vecino, Boolean.TRUE);
+cola.encolar(vecino);
+}
+}
+}
+resultado.agregarSubred(subred);
+}
+return resultado;
+}
+public static ResultadoRuta rutaMasRapida(Grafo grafo, String origen, String destino) {
+if (!grafo.existeVertice(origen) || !grafo.existeVertice(destino)) {
+throw new IllegalArgumentException("Las estaciones de origen y destino deben existir.");
+}
+if (origen.equals(destino)) {
+return new ResultadoRuta(origen, destino, new String[]{origen}, new double[0], 0);
+}
+int capacidad = grafo.getNumVertices() * 2 + 1;
+TablaHash<Double> distancia = new TablaHash<>(capacidad);
+TablaHash<String> previo = new TablaHash<>(capacidad);
+TablaHash<Boolean> definitivo = new TablaHash<>(capacidad);
+ColaPrioridad cola = new ColaPrioridad();
+distancia.insertar(origen, 0.0);
+cola.insertar(origen, 0.0);
+while (!cola.estaVacia()) {
+double distanciaActual = cola.prioridadMinima();
+String actual = cola.extraerMinimo();
+if (definitivo.contiene(actual)) {
+continue;
+}
+definitivo.insertar(actual, Boolean.TRUE);
+if (actual.equals(destino)) {
+break;
+}
+for (Nodo<Arista> n = grafo.obtenerAdyacentes(actual).getCabeza(); n != null; n = n.getSiguiente()) {
+String vecino = n.getDato().getDestino();
+if (definitivo.contiene(vecino)) {
+continue;
+}
+double nueva = distanciaActual + n.getDato().getTiempo();
+Double conocida = distancia.obtener(vecino);
+if (conocida == null || nueva < conocida) {
+distancia.insertar(vecino, nueva);
+previo.insertar(vecino, actual);
+cola.insertar(vecino, nueva);
+}
+}
+}
+if (!definitivo.contiene(destino)) {
+return new ResultadoRuta(origen, destino, null, null, Double.POSITIVE_INFINITY);
+}
+ListaEnlazada<String> recorrido = new ListaEnlazada<>();
+for (String paso = destino; paso != null; paso = previo.obtener(paso)) {
+recorrido.agregarAlInicio(paso);
+}
+String[] camino = new String[recorrido.tamano()];
+int i = 0;
+for (Nodo<String> n = recorrido.getCabeza(); n != null; n = n.getSiguiente()) {
+camino[i++] = n.getDato();
+}
+double[] tramos = new double[camino.length - 1];
+for (int k = 0; k < tramos.length; k++) {
+tramos[k] = grafo.buscarArista(camino[k], camino[k + 1]).getTiempo();
+}
+return new ResultadoRuta(origen, destino, camino, tramos, distancia.obtener(destino));
+}
+public static InfoGrado[] calcularCentralidadGrado(Grafo grafo) {
+String[] vertices = grafo.obtenerVertices();
+InfoGrado[] ranking = new InfoGrado[vertices.length];
+double divisor = Math.max(1, vertices.length - 1);
+for (int i = 0; i < vertices.length; i++) {
+int grado = grafo.grado(vertices[i]);
+ranking[i] = new InfoGrado(vertices[i], grado, grado / divisor);
+}
+Ordenamiento.mergeSort(ranking, (a, b) -> a.getGrado() != b.getGrado()
+? Integer.compare(b.getGrado(), a.getGrado())
+: a.getId().compareToIgnoreCase(b.getId()));
+return ranking;
+}
+public static String[] obtenerHubs(InfoGrado[] ranking) {
+if (ranking.length == 0 || ranking[0].getGrado() == 0) {
+return new String[0];
+}
+int maximo = ranking[0].getGrado();
+int cantidad = 0;
+while (cantidad < ranking.length && ranking[cantidad].getGrado() == maximo) {
+cantidad++;
+}
+String[] hubs = new String[cantidad];
+for (int i = 0; i < cantidad; i++) {
+hubs[i] = ranking[i].getId();
+}
+return hubs;
+}
+public static int subredesTrasCierre(Grafo grafo, String id) {
+return detectarSubredes(grafo, id).getCantidad();
+}
+}
+// ===== algoritmos/InfoGrado.java (20 líneas) =====
+package urbanroute.algoritmos;
+public class InfoGrado {
+private final String id;
+private final int grado;
+private final double centralidad;
+InfoGrado(String id, int grado, double centralidad) {
+this.id = id;
+this.grado = grado;
+this.centralidad = centralidad;
+}
+public String getId() {
+return id;
+}
+public int getGrado() {
+return grado;
+}
+public double getCentralidad() {
+return centralidad;
+}
+}
+// ===== algoritmos/ResultadoRuta.java (36 líneas) =====
+package urbanroute.algoritmos;
+public class ResultadoRuta {
+private final String origen;
+private final String destino;
+private final String[] camino;
+private final double[] tramos;
+private final double tiempoTotal;
+ResultadoRuta(String origen, String destino, String[] camino, double[] tramos, double tiempoTotal) {
+this.origen = origen;
+this.destino = destino;
+this.camino = camino;
+this.tramos = tramos;
+this.tiempoTotal = tiempoTotal;
+}
+public boolean existeRuta() {
+return camino != null;
+}
+public String getOrigen() {
+return origen;
+}
+public String getDestino() {
+return destino;
+}
+public String[] getCamino() {
+return camino;
+}
+public double[] getTramos() {
+return tramos;
+}
+public double getTiempoTotal() {
+return tiempoTotal;
+}
+public int getParadasIntermedias() {
+return camino == null ? 0 : Math.max(0, camino.length - 2);
+}
+}
+// ===== algoritmos/ResultadoSubredes.java (37 líneas) =====
+package urbanroute.algoritmos;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.estructuras.Nodo;
+import urbanroute.estructuras.TablaHash;
+public class ResultadoSubredes {
+private final ListaEnlazada<ListaEnlazada<String>> subredes = new ListaEnlazada<>();
+private final TablaHash<Integer> indicePorEstacion = new TablaHash<>();
+void agregarSubred(ListaEnlazada<String> subred) {
+int indice = subredes.tamano();
+for (Nodo<String> n = subred.getCabeza(); n != null; n = n.getSiguiente()) {
+indicePorEstacion.insertar(n.getDato(), indice);
+}
+subredes.agregar(subred);
+}
+public int getCantidad() {
+return subredes.tamano();
+}
+public ListaEnlazada<String> getSubred(int indice) {
+return subredes.obtener(indice);
+}
+public ListaEnlazada<ListaEnlazada<String>> getSubredes() {
+return subredes;
+}
+public int getIndiceSubred(String id) {
+Integer indice = indicePorEstacion.obtener(id);
+return indice == null ? -1 : indice;
+}
+public int contarEstacionesAisladas() {
+int aisladas = 0;
+for (Nodo<ListaEnlazada<String>> n = subredes.getCabeza(); n != null; n = n.getSiguiente()) {
+if (n.getDato().tamano() == 1) {
+aisladas++;
+}
+}
+return aisladas;
+}
+}
