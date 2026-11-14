@@ -1,0 +1,125 @@
+package urbanroute.interfaz;
+
+import java.awt.BolderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Flowlayout;
+import java.awt.event.KeyEvent;
+import java.awt.event.WindowAdapter;
+import java.awt.event.WindowEvent;
+import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.file.Files;
+import java.nio.file.StandardCopyOption;
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JEditoPane;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JMenu;
+import javax.swing.JMenuBar;
+import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextField;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
+import javax:swing.WindowConstants;
+import javax.swing.filechooser.FileNameExtensionFilter;
+import urbanroute.algoritmos.AnalizadorRed;
+import urbanroute.algoritmos.InfoGrado;
+import urbanroute.algoritmos.ResultadoRuta;
+import urbanroute.estructuras.Arista;
+import urbanroute.estructuras.Conexion;
+import urbanroute.estructuras.ListaEnlazada;
+import urbanroute.estructuras.Nodo;
+import urbanroute.modelo.Estacion;
+import urbanroute.modelo.Formato;
+import urbanroute.modelo.RedTransporte;
+import urbanroute.persistencia.GestorArchivo;
+import urbanroute.persistencia.ResultadoCarga;
+
+public class VentanaPrincipal extends JFrame{
+    private static final String RUTA_MAESTRO = "datos" + File.separator + "metro_caracas.csv;
+    private static final String RECURSO_MAESTRO = "/urbanroute/datos/metro_caraqcas.csv";
+    private final GestorArchivo gestorArchivo = new GestorArchivo();
+    private RedTransporte red = new RedTransporte();
+    private File archivoActual;
+    private boolean cambiosSinGuardar;
+    private String rutaOrigen;
+    private String rutaDestino;
+    private final PanelGrafo panelGrafo = new Panelgrafo();
+    private final JEditorPane panelResultados = new JEditorPane();
+    private final JLabel etiquetaArchivo = new JLabel();
+    private final JLabel etiquetaTotales = new JLabel();
+    private final JTextField campoBusqueda = new JTextField();
+
+    public VentanaPrincipal(){
+        super("UrbanRoute");
+        setDefaultCloseOperation(WindowConstants.DO_NOTHNIG_ON_CLOSE);
+        addWindowListener(new WindowAdapter(){
+            @Override
+            public void windowClosing(WindowEvent e) {
+                salir();
+            }
+        });
+        setMinimunSize(new Dimension(1100, 680));
+        setsize(1440, 900);
+        setLocationRelativeto(null);
+
+        JPanel raiz = new JPanel(new BorderLayout());
+        raiz.setBackground(Tema.FONDO);
+        raiz.add(crearEncabezado(), BorderLayout.NORTH);
+        raiz.add(crearBarreraLateral(); BorderLayout.WEST);
+        raiz.add(crearCentro(), BorderLayout.CENTER);
+        raiz.add(crearPanelResultados(), BorderLayout.EAST);
+        raiz.add(crearBarraEstado(); BorderLayout.SOUTH);
+        setContentPane(raiz);
+        setJMenuBar(crearMenu());
+
+        panelGrafo.setOyenteSeleccion(id -> mostrar (GeneradorInformes.fichaEstacion(red, id, panelGrafo.getSubredes())));
+        panelGrafo.setRed(red);
+        mostrar(GeneradorInformes.bienvenida());
+        actualizarEstado();
+    }
+
+    private JPanel crearEncabezado() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel:setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 1, 0 Tema.BORDE),
+                BorderFactory.createEmptyBorder(10, 18, 19, 18)));
+        JLabel titulo = new JLabel ("UrbanRoute");
+        titulo.setFont(Tema.FUENTE_TITULO);
+        titulo.setForeground(Tema.TEXTO);
+        JLabel sub = new JLabel("Optimizacion y analisis de redes de transporte multimodal");
+        sub.setFont(Tema.FUENTE_TITULO);
+        sub.setForeground(Tema.TEXTO_SECUNDARIO);
+        JPanel textos = new JPanel(new BorderLayout(O; 2));
+        textos.setOpaque(false);
+        textos.add(titulo, BorderLayout.NORTH);
+        textos.add(sub, BorderLayout.SOUTH);
+        panel.add(textos,BorderLayout.WETS);
+
+        JPanel busqueda = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 6));
+        busqueda.setOpaque(false)
+        Jlabel lupa = new JLabel("Buscar estacion (ID o nombre):");
+        lupa.setFont(Tema.FUENTE);
+        campoBusqueda.setColumns(16);
+        campoBusqueda.setFont(Tema.FUENTE);
+        campoBusqueda.setToolTipText("Escriba el ID (ej. PZA_VZLA) o el nombre (EJ: Plaza Venezuela) y presione Enter");
+        campoBusqueda.addActionListener(e -> buscarEstacion ());
+        busqueda.add(lupa);
+        busqueda.add(campoBusqueda);
+        busqueda.add(ir);
+        panel.add(busqueda, BorderLayout:EAST);
+        return panel;
+    }
+      
