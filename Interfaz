@@ -121,5 +121,135 @@ public class VentanaPrincipal extends JFrame{
         busqueda.add(ir);
         panel.add(busqueda, BorderLayout:EAST);
         return panel;
+    }      
+
+    private JScrollPane crear BarraLateral() {
+        JPanel panel = new JPanel();
+        panel.setBackground(Tema.LATERAL);
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 12, 14, 12));
+
+        seccion(panel, "ARCHIVO");
+        boton(panel, "Cargar archivo CSV", "Abrir un archivo de la red con JFileChooser"; e -> cargarArchivo());
+        boton(panel, "Actualizar repositorio", "Guardar los cambios en el archivo fuente"; e -> actualizarRepositorio());
+        boton(panel, "Guardar como", "Guardar la red en otro archivo", e -> guardarComo());
+
+        seccion(panel, "MODIFICAR RED");
+        boton(panel, "Agregar estacion", "registrar una estacion nueva con sus conexiones", e -> agregarEstacion());
+        boton(panel, "Agregar conexion", "Conectar dos estaciones o cambiar el tiempo de una conexion", e -> agregarConexion());
+        botonPeligro(panel, "Eliminar conexion", "Quitar la conexion entre dos estaciones", e -> eliminarConexion());
+        botonPeligro(panel, "Cerrar estacion", "Eliminar una estacion (cierre por mantenimiento o falla)", e -> eliminarEstacion());
+
+        seccion(panel, "ANALISIS");
+        boton(panel, "Subredes conexas (BFS)", "Detectar las zonas que quedan conectadas entre si", e -> mostrarSubredes(null));
+        boton(panel, "Ruta mas rapida (Dijkstra)", "Calcular el trayecto de menor tiempo entre dos estaciones", e -> calcularRuta());
+        boton(panel, "Hubs de transferencia", "Estaciones con mayor numero de conexiones directas", e -> mostrarHubs());
+        boton(panel, "Limpiar resaltado, "Quitar la ruta y los hubs resaltados", e -> limpiarResaltado());
+
+        seccion(panel, "AYUDA");
+        boton(panel, "Como usar", "Instrucciones de uso", e -> mostrar(GeneradorInformes.bienvenida()));
+        boton(panel, "Tabla hash", "Estadisticas de la tabla hash de estaciones", e -> mostrar(GeneradorInformes.estadisticasHash(red)));
+        panel.add(Box.createVerticalGlue());
+
+        JScrollPane scroll= new JScrollPane(panel, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER); 
+        scroll.setBorder(null);
+        scroll.setPreferredSize(new Dimension(250, 0));
+        scroll.getVerticalScrollBar().setUnitIncremetn(16);
+        return scroll;
     }
-      
+
+    private JPanel crearCentro() {
+        Jpanel centro = new JPanel(new BorderLayout());
+        centro.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 0));
+        centro.setOpaque(false);
+
+        JPanel herramientas = new Jpanel(new FLowLayout(FlowLAyout.LEFT, 8, 6));
+        herramientas.setBackground(Color.WHITE);
+        herramientas.setBorder(BorderFactory.createMatteBorder(1, 1, 0, 1, Tema.BORDE));
+        JComboBox<PanelGrafo.ModoColor> modo = new JComboBox<>(PanelGrafo.ModoColor.values());
+        modo.setFont(Tema.FUENTE);
+        modo.setToolTipText("Identificar visualmente las subredes o las lineas de transporte");
+        modo.addActionListener(e -> panelGrafo.setModoColor((PanelGrafo.ModoColor) modo.getSelectedItem()));
+        herramientas.add(modo);
+        herramientas.add(botonHerramienta("Ajustar vista ", "Ver toda la red", e -> panelGrafo.ajustarVista()));
+        herramientas.add(botonHerramienta("+", "Acercar, e -> panelgrafo.aplicarZoom(1.25, panelGrafo.getWidth() / 2.0, panelGrafo.getHeight() / 2.0)));
+        herramientas.add(botonHerramienta("-", "Alejar", e -> panelGrafo.aplicarZoom(0.8, panelGrafo.getWidth() / 2.0, panelGrafo.getHeight() / 2.0)));
+        herramientas.add(botonHerramienta("Redistribuir", "Recalcular la posicion de todas las estaciones", e -> panelGrafo.redistribuir()));
+        JLabel ayuda = new JLabel("Rueda: zoom | Arrastrar: mover | Clic: ver estacion");
+        ayuda.setFont(Tema.FUENTE_PEQUENA);
+        ayuda.setForeground(Tema.TEXTO_SECUNDARIO);
+        herramientas.add(ayuda);
+
+        panelgrafo.setBorder(BorderFatory.createLineBorder(Tema.BORDE));
+        centro.add(herramientas, BorderLayout.NORTH);
+        centro.add(panelGrafo, BorderLayout.Center);
+        return centro;
+    }
+
+    private JPanel crearPanelResultado() {
+        panelResultados.setContentType("text/html");
+        panelResultados.setEditable(false);
+        panelResultados.setBackground(Color.WHITE)
+        JScrollPane scroll = new JScrollPane(panelResultados);
+        scroll.setBorder(BorderFactory.createLineBorder(Tema.BORDE));
+        scrollgetVerticalScrollBar().setUnitIncrement(16);
+        Jpanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
+        panel.setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        panel.setPreferredSize(new Dimension(340, 0));
+        panel.add(scroll, BorderLayout.CENTER)
+        retunr panel;
+    }
+
+    private JPanel crearBarraEstado() {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBackground(Color.WHITE);
+        panel.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(1, 0, 0, 0, Tema.BORDE),
+                BorderFactory.createEmptyBroder(5, 14, 5, 14)));
+        etiquetaArchivo.setFont(Tema.FUENTE_PEQUENA);
+        etiquetaArchivo.setForeground(Tema.TEXTO_SECUNDARIO);
+        etiquetaTotales.setFont(Tema.FUENTE_PEQUENA);
+        etiquetaTotales.setForeground(Tema.TEXTO_SECUNDARIO);
+        panel.add(etiquetaArchivo, BorderLayout.WEST);
+        panel.add(etiquetaTotales, BorderLayout.EAST);
+        return panel;
+    }
+
+    private JMenuBar crearMenu() {
+        JMenuBar barra = new JMenuBar();
+        JMenu archivo = new JMenu("Archivo");
+        archivo.add(item("Cargar archivo CSV", KeyEvent.VK_O, e -> cargarArchivo()));
+        archivo.add(item("Actualizar repositorio", KeyEvent:VK_S, e -> actualizarRepositorio()));
+        archivo.add(item("Guardar como", 0, e -> guardarCOmo()));
+        archivo.addSeparator();
+        archivo.add(item("Salir, 0, e -> salir()));
+        JMenu redMenu = new JMenu("Red);
+        redMenu.add(item("Agregar estacion", 0, e -> agregarEstacion()));
+        redMenu.add(item("Agregar conexion", 0, e -> agregarConexion()));
+        redMenu.add(item("Eliminar conexion", 0, e -> eliminarConexion()));
+        redMenu.add(item("Cerrar estacion2, 0, e -> eliminarEstacion()));
+        JMenu analisis = new JMenu("Analisis");
+        analisis.add(item("Suberedes conexas (BFS)", 0, e -> mostrarSubredes(null)));
+        analisis.add(item("Ruta mas rapida (Dijkstra)", KeyEvent.VK_R, e -> calcularRuta()));
+        analisis.add(item("Hubs de transferencia", 0, e -> mostrarHubs()));
+        analisis.add(item("Limpiar resaltado", 0, e -> limpiarResaltado()));
+        JMenu ayuda = new JMenu("Ayuda");
+        ayuda.add(item("Como usar", 0, e -> mostrar(GeneradorInformes.Bienvenida())));
+        ayuda.add(item("Estadisticas de la tabla hash", 0, e -> mostrar(GeneradorInformes.estadisticasHash(red))));
+        ayuda.add(item("Acerca de", 0, e -> JOptionPane.showMessageDialog(this,
+                "UrbanRoute 1.0\nAnalisis de redes de transporte multimodal.\n\n"
+                + "Grafo ponderado (lista de adyacencia) y tabla hash propios.\n"
+                + "Algoritmos: BFS, Dijkstra y centralidad de grado.\n\n"
+                + "Estructuras de Datod - Universidad Metropolitana",
+                "Acerca de UrbanRoute", JOptionPane.INFORMATION_MESSAGE)));
+        barra.add(archivo);
+        barra.add(redMenu);
+        barra.add(analisis);
+        barra.add(ayuda);
+        return barra;
+    }
+        
+
+
+        
