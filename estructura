@@ -166,3 +166,474 @@ public String getOrigen
 return origen;
 }
 public String getDestino() { 
+return destino;
+}
+public double getTiempo() {
+return tiempo;
+}
+}
+// ===== estructuras/EntradaHash.java (11 líneas) =====
+package urbanroute.estructuras;
+class EntradaHash<V> {
+final String clave;
+V valor;
+EntradaHash<V> siguiente;
+EntradaHash(String clave, V valor, EntradaHash<V> siguiente) {
+this.clave = clave;
+this.valor = valor;
+this.siguiente = siguiente;
+}
+}
+// ===== estructuras/Grafo.java (120 líneas) =====
+package urbanroute.estructuras;
+public class Grafo {
+private final TablaHash<ListaEnlazada<Arista>> listaAdyacencia = new TablaHash<>();
+private final ListaEnlazada<String> vertices = new ListaEnlazada<>();
+private int numAristas;
+public boolean agregarVertice(String id) {
+if (id == null || listaAdyacencia.contiene(id)) {
+return false;
+}
+listaAdyacencia.insertar(id, new ListaEnlazada<>());
+vertices.agregar(id);
+return true;
+}
+public boolean eliminarVertice(String id) {
+ListaEnlazada<Arista> adyacentes = listaAdyacencia.obtener(id);
+if (adyacentes == null) {
+return false;
+}
+for (Nodo<Arista> n = adyacentes.getCabeza(); n != null; n = n.getSiguiente()) {
+ListaEnlazada<Arista> delVecino = listaAdyacencia.obtener(n.getDato().getDestino());
+if (delVecino != null) {
+delVecino.eliminarPrimero(a -> a.getDestino().equals(id));
+}
+numAristas--;
+}
+listaAdyacencia.eliminar(id);
+vertices.eliminar(id);
+return true;
+}
+public boolean agregarArista(String origen, String destino, double tiempo) {
+ListaEnlazada<Arista> deOrigen = listaAdyacencia.obtener(origen);
+ListaEnlazada<Arista> deDestino = listaAdyacencia.obtener(destino);
+if (deOrigen == null || deDestino == null) {
+throw new IllegalArgumentException("Ambas estaciones deben existir en el grafo.");
+}
+if (origen.equals(destino)) {
+throw new IllegalArgumentException("Una estación no puede conectarse consigo misma.");
+}
+if (!(tiempo > 0) || Double.isInfinite(tiempo)) {
+throw new IllegalArgumentException("El tiempo de traslado debe ser mayor que cero.");
+}
+Arista ida = buscarArista(origen, destino);
+if (ida != null) {
+ida.setTiempo(tiempo);
+buscarArista(destino, origen).setTiempo(tiempo);
+return false;
+}
+deOrigen.agregar(new Arista(destino, tiempo));
+deDestino.agregar(new Arista(origen, tiempo));
+numAristas++;
+return true;
+}
+public boolean eliminarArista(String origen, String destino) {
+ListaEnlazada<Arista> deOrigen = listaAdyacencia.obtener(origen);
+ListaEnlazada<Arista> deDestino = listaAdyacencia.obtener(destino);
+if (deOrigen == null || deDestino == null) {
+return false;
+}
+boolean eliminada = deOrigen.eliminarPrimero(a -> a.getDestino().equals(destino));
+if (eliminada) {
+deDestino.eliminarPrimero(a -> a.getDestino().equals(origen));
+numAristas--;
+}
+return eliminada;
+}
+public Arista buscarArista(String origen, String destino) {
+ListaEnlazada<Arista> deOrigen = listaAdyacencia.obtener(origen);
+if (deOrigen == null) {
+return null;
+}
+return deOrigen.buscar(a -> a.getDestino().equals(destino));
+}
+public boolean existeArista(String origen, String destino) {
+return buscarArista(origen, destino) != null;
+}
+public boolean existeVertice(String id) {
+return listaAdyacencia.contiene(id);
+}
+public ListaEnlazada<Arista> obtenerAdyacentes(String id) {
+ListaEnlazada<Arista> lista = listaAdyacencia.obtener(id);
+return lista == null ? new ListaEnlazada<>() : lista;
+}
+public int grado(String id) {
+ListaEnlazada<Arista> lista = listaAdyacencia.obtener(id);
+return lista == null ? 0 : lista.tamano();
+}
+public String[] obtenerVertices() {
+String[] resultado = new String[vertices.tamano()];
+int i = 0;
+for (Nodo<String> n = vertices.getCabeza(); n != null; n = n.getSiguiente()) {
+resultado[i++] = n.getDato();
+}
+return resultado;
+}
+public ListaEnlazada<Conexion> obtenerConexiones() {
+ListaEnlazada<Conexion> resultado = new ListaEnlazada<>();
+TablaHash<Boolean> procesados = new TablaHash<>(vertices.tamano() * 2 + 1);
+for (Nodo<String> v = vertices.getCabeza(); v != null; v = v.getSiguiente()) {
+String origen = v.getDato();
+for (Nodo<Arista> a = obtenerAdyacentes(origen).getCabeza(); a != null; a = a.getSiguiente()) {
+if (!procesados.contiene(a.getDato().getDestino())) {
+resultado.agregar(new Conexion(origen, a.getDato().getDestino(), a.getDato().getTiempo()));
+}
+}
+procesados.insertar(origen, Boolean.TRUE);
+}
+return resultado;
+}
+public int getNumVertices() {
+return vertices.tamano();
+}
+public int getNumAristas() {
+return numAristas;
+}
+public void vaciar() {
+listaAdyacencia.vaciar();
+vertices.vaciar();
+numAristas = 0;
+}
+}
+// ===== estructuras/ListaEnlazada.java (85 líneas) =====
+package urbanroute.estructuras;
+public class ListaEnlazada<T> {
+private Nodo<T> cabeza;
+private Nodo<T> cola;
+private int tamano;
+public void agregar(T dato) {
+Nodo<T> nuevo = new Nodo<>(dato);
+if (cabeza == null) {
+cabeza = nuevo;
+cola = nuevo;
+} else {
+cola.setSiguiente(nuevo);
+cola = nuevo;
+}
+tamano++;
+}
+public void agregarAlInicio(T dato) {
+Nodo<T> nuevo = new Nodo<>(dato);
+nuevo.setSiguiente(cabeza);
+cabeza = nuevo;
+if (cola == null) {
+cola = nuevo;
+}
+tamano++;
+}
+public T obtener(int indice) {
+if (indice < 0 || indice >= tamano) {
+throw new IndexOutOfBoundsException("Índice fuera de rango: " + indice);
+}
+Nodo<T> actual = cabeza;
+for (int i = 0; i < indice; i++) {
+actual = actual.getSiguiente();
+}
+return actual.getDato();
+}
+public T buscar(Condicion<T> condicion) {
+for (Nodo<T> n = cabeza; n != null; n = n.getSiguiente()) {
+if (condicion.cumple(n.getDato())) {
+return n.getDato();
+}
+}
+return null;
+}
+public boolean eliminar(T dato) {
+return eliminarPrimero(e -> e == null ? dato == null : e.equals(dato));
+}
+public boolean eliminarPrimero(Condicion<T> condicion) {
+Nodo<T> anterior = null;
+Nodo<T> actual = cabeza;
+while (actual != null) {
+if (condicion.cumple(actual.getDato())) {
+if (anterior == null) {
+cabeza = actual.getSiguiente();
+} else {
+anterior.setSiguiente(actual.getSiguiente());
+}
+if (actual == cola) {
+cola = anterior;
+}
+tamano--;
+return true;
+}
+anterior = actual;
+actual = actual.getSiguiente();
+}
+return false;
+}
+public boolean contiene(T dato) {
+return buscar(e -> e == null ? dato == null : e.equals(dato)) != null;
+}
+public Nodo<T> getCabeza() {
+return cabeza;
+}
+public int tamano() {
+return tamano;
+}
+public boolean estaVacia() {
+return tamano == 0;
+}
+public void vaciar() {
+cabeza = null;
+cola = null;
+tamano = 0;
+}
+}
+// ===== estructuras/Nodo.java (20 líneas) =====
+package urbanroute.estructuras;
+public class Nodo<T> {
+private T dato;
+private Nodo<T> siguiente;
+public Nodo(T dato) {
+this.dato = dato;
+}
+public T getDato() {
+return dato;
+}
+public void setDato(T dato) {
+this.dato = dato;
+}
+public Nodo<T> getSiguiente() {
+return siguiente;
+}
+public void setSiguiente(Nodo<T> siguiente) {
+this.siguiente = siguiente;
+}
+}
+// ===== estructuras/Ordenamiento.java (40 líneas) =====
+package urbanroute.estructuras;
+public final class Ordenamiento {
+private Ordenamiento() {
+}
+@SuppressWarnings("unchecked")
+public static <T> void mergeSort(T[] arreglo, Comparador<? super T> comparador) {
+if (arreglo == null || arreglo.length < 2) {
+return;
+}
+Object[] auxiliar = new Object[arreglo.length];
+ordenar(arreglo, (T[]) auxiliar, 0, arreglo.length - 1, comparador);
+}
+private static <T> void ordenar(T[] a, T[] aux, int inicio, int fin, Comparador<? super T> c) {
+if (inicio >= fin) {
+return;
+}
+int medio = (inicio + fin) >>> 1;
+ordenar(a, aux, inicio, medio, c);
+ordenar(a, aux, medio + 1, fin, c);
+mezclar(a, aux, inicio, medio, fin, c);
+}
+private static <T> void mezclar(T[] a, T[] aux, int inicio, int medio, int fin, Comparador<? super T> c) {
+for (int k = inicio; k <= fin; k++) {
+aux[k] = a[k];
+}
+int i = inicio;
+int j = medio + 1;
+for (int k = inicio; k <= fin; k++) {
+if (i > medio) {
+a[k] = aux[j++];
+} else if (j > fin) {
+a[k] = aux[i++];
+} else if (c.comparar(aux[j], aux[i]) < 0) {
+a[k] = aux[j++];
+} else {
+a[k] = aux[i++];
+}
+}
+}
+}
+// ===== estructuras/TablaHash.java (183 líneas) =====
+package urbanroute.estructuras;
+public class TablaHash<V> {
+private static final int CAPACIDAD_INICIAL = 31;
+public static final double FACTOR_CARGA_MAXIMO = 0.75;
+private EntradaHash<V>[] cubetas;
+private int tamano;
+public TablaHash() {
+this(CAPACIDAD_INICIAL);
+}
+public TablaHash(int capacidadInicial) {
+cubetas = crearCubetas(siguientePrimo(Math.max(3, capacidadInicial)));
+}
+private static int funcionHash(String clave, int capacidad) {
+long h = 0;
+for (int i = 0; i < clave.length(); i++) {
+h = (h * 31 + clave.charAt(i)) % capacidad;
+}
+return (int) h;
+}
+public void insertar(String clave, V valor) {
+validarClave(clave);
+int indice = funcionHash(clave, cubetas.length);
+for (EntradaHash<V> e = cubetas[indice]; e != null; e = e.siguiente) {
+if (e.clave.equals(clave)) {
+e.valor = valor;
+return;
+}
+}
+cubetas[indice] = new EntradaHash<>(clave, valor, cubetas[indice]);
+tamano++;
+if (factorCarga() > FACTOR_CARGA_MAXIMO) {
+redimensionar();
+}
+}
+public V obtener(String clave) {
+if (clave == null) {
+return null;
+}
+int indice = funcionHash(clave, cubetas.length);
+for (EntradaHash<V> e = cubetas[indice]; e != null; e = e.siguiente) {
+if (e.clave.equals(clave)) {
+return e.valor;
+}
+}
+return null;
+}
+public boolean contiene(String clave) {
+if (clave == null) {
+return false;
+}
+int indice = funcionHash(clave, cubetas.length);
+for (EntradaHash<V> e = cubetas[indice]; e != null; e = e.siguiente) {
+if (e.clave.equals(clave)) {
+return true;
+}
+}
+return false;
+}
+public V eliminar(String clave) {
+if (clave == null) {
+return null;
+}
+int indice = funcionHash(clave, cubetas.length);
+EntradaHash<V> anterior = null;
+for (EntradaHash<V> e = cubetas[indice]; e != null; e = e.siguiente) {
+if (e.clave.equals(clave)) {
+if (anterior == null) {
+cubetas[indice] = e.siguiente;
+} else {
+anterior.siguiente = e.siguiente;
+}
+tamano--;
+return e.valor;
+}
+anterior = e;
+}
+return null;
+}
+public String[] claves() {
+String[] resultado = new String[tamano];
+int k = 0;
+for (EntradaHash<V> cabeza : cubetas) {
+for (EntradaHash<V> e = cabeza; e != null; e = e.siguiente) {
+resultado[k++] = e.clave;
+}
+}
+return resultado;
+}
+public ListaEnlazada<V> valores() {
+ListaEnlazada<V> resultado = new ListaEnlazada<>();
+for (EntradaHash<V> cabeza : cubetas) {
+for (EntradaHash<V> e = cabeza; e != null; e = e.siguiente) {
+resultado.agregar(e.valor);
+}
+}
+return resultado;
+}
+public void vaciar() {
+cubetas = crearCubetas(cubetas.length);
+tamano = 0;
+}
+public int tamano() {
+return tamano;
+}
+public boolean estaVacia() {
+return tamano == 0;
+}
+public int capacidad() {
+return cubetas.length;
+}
+public double factorCarga() {
+return (double) tamano / cubetas.length;
+}
+public int cubetasOcupadas() {
+int ocupadas = 0;
+for (EntradaHash<V> cabeza : cubetas) {
+if (cabeza != null) {
+ocupadas++;
+}
+}
+return ocupadas;
+}
+public int longitudCadenaMasLarga() {
+int maximo = 0;
+for (EntradaHash<V> cabeza : cubetas) {
+int longitud = 0;
+for (EntradaHash<V> e = cabeza; e != null; e = e.siguiente) {
+longitud++;
+}
+if (longitud > maximo) {
+maximo = longitud;
+}
+}
+return maximo;
+}
+public int colisiones() {
+return tamano - cubetasOcupadas();
+}
+private void redimensionar() {
+EntradaHash<V>[] anteriores = cubetas;
+cubetas = crearCubetas(siguientePrimo(anteriores.length * 2 + 1));
+for (EntradaHash<V> cabeza : anteriores) {
+EntradaHash<V> e = cabeza;
+while (e != null) {
+EntradaHash<V> siguiente = e.siguiente;
+int indice = funcionHash(e.clave, cubetas.length);
+e.siguiente = cubetas[indice];
+cubetas[indice] = e;
+e = siguiente;
+}
+}
+}
+@SuppressWarnings({"unchecked", "rawtypes"})
+private EntradaHash<V>[] crearCubetas(int capacidad) {
+return (EntradaHash<V>[]) new EntradaHash[capacidad];
+}
+private static void validarClave(String clave) {
+if (clave == null) {
+throw new IllegalArgumentException("La clave de la tabla hash no puede ser nula.");
+}
+}
+private static int siguientePrimo(int n) {
+int candidato = Math.max(2, n);
+while (!esPrimo(candidato)) {
+candidato++;
+}
+return candidato;
+}
+private static boolean esPrimo(int n) {
+if (n < 2) {
+return false;
+}
+if (n % 2 == 0) {
+return n == 2;
+}
+for (int d = 3; (long) d * d <= n; d += 2) {
+if (n % d == 0) {
+return false;
+}
+}
+return true;
+}
+}
