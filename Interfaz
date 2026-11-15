@@ -46,7 +46,7 @@ import urbanroute.modelo.RedTransporte;
 import urbanroute.persistencia.GestorArchivo;
 import urbanroute.persistencia.ResultadoCarga;
 
-public class VentanaPrincipal extends JFrame{
+public class VentanaPrincipal extends JFrame {
     private static final String RUTA_MAESTRO = "datos" + File.separator + "metro_caracas.csv;
     private static final String RECURSO_MAESTRO = "/urbanroute/datos/metro_caraqcas.csv";
     private final GestorArchivo gestorArchivo = new GestorArchivo();
@@ -250,6 +250,389 @@ public class VentanaPrincipal extends JFrame{
         return barra;
     }
         
+    private static void seccion(JPanel panel, String texto) {
+        if (panel.getComponentCount() > 0) {
+            panel.add(Box.createVerticalStrut(14));
+        }
+        JLabel etiqueta = new JLabel(texto);
+        etiqueta.setFont(Tema.FUENTE_NEGRITA.deriveFont(11f));
+        etiqueta.setForeground(Tema.LATERAL_TITULO);
+        etiqueta.setAlignmentX(Component.LEFT_ALIGNMENT);
+        etiqueta.setBorder(BorderFactory.createEmptyBorder(0, 4, 6, 0));
+        etiqueta.setMaximumSize(new Dimension(Interger.MAX_VALUE, etiqueta.getPreferredSize().height));
+        panel.add(etiqueta);
+    }
 
+    private static void boton(JPanel panel, String texto, Sting ayuda, java.awt.event.ActionListener accion) {
+        agregarBoton(panel, new BotonPlano(texto, Tema.LATERAL_BOTON, Tema.LATERAL_BOTON_HOVER, Tema.LATERAL_TEXTO, ayuda), accion);
+    }
 
+    private static void botonPeligrp(JPanel panel, String texto, String ayuda, java.awt.event.ActionListener accion){
+        agregarBoton(panel, new BotonPlano(texto, Tema.LATERAL_BOTON, Tema.PELIGRO_HOVER, new Color(0xFFB4B4), ayuda), accion);
+    }
+
+    private static void agregarBoton(JPanel panel, JButton b, java.awt.event.ActionListener accion) {
+        b.setAlignmentX(Component.LEFT_ALIGNMENT);
+        b.addActionListener(accion);
+        panel.add(b);
+        panel.add(Box.createVertialStrut(5));
+    }
+
+    private static JButton botonHerramienta(String texto, String ayuda, java.awt.event.ActionListener accion) {
+        BotonPlano b = new BotonPlano(texto, new Color(0xEEF2F7), new Color(0xDDE5EF), Tema.TEXTO, ayuda);
+        b.setHorizontalAlignment(JLabel.CENTER);
+        b.setMargin(new java.awt.Insets(5, 10, 5, 10));
+        b.addActionListener(accion);
+        return b;
+    }
+
+    private static JMenu item(String tecto, int tecla, java.awt.event.ActionListener accion) {
+        JMenuItem item = new JMenuItem(texto);
+        if (tecla != =) {
+            item.setAccelerator(KeyStroke.getKeyStroke(tecla, java.awt.event.InputEvent.CTRL_DOWN_MASK));
+        }
+        item.addActionListener(accion);
+        return item;
+    }
+
+    public void cargarArchivoMaestro() {
+        File maetro = new File(Syste.getProperty("user.dir"), RUTA_MAESTRO);
+        try {
+            if (!maestro.isFile()) {
+                try(InputStream entrada = VentanaPrincipal.class.getResourceAsStream(RECURSO_MAESTRO)) {
+                    if (entrada == null) {
+                        throw new IOException("No se encontro el archivo maestro.");
+                    }
+                    File carpeta = maestro.getParentFile();
+                    if (carpeta != null) {
+                        carpeta.mkdirs();
+                    }
+                    Files.copy(entrada, maestro.toPath(), StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+            cargarDesde(maestro, false);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                    "No se pudo cargar el archivo maestro: \n" + ex.getMessage()
+                    + "\n\nPuede cargar otro archivo con \"Cargar archivo CSV\".",
+                    "Archivo maestro", JOptionPane.WARNING_MESSAGE);
+        }
+    }
+
+    private void cargarArchivo() {
+        if(red.getNumEstaciones() > 0) {
+            String detalle = cambiosSinguardar
+                    ? "Hay cambios SIN GUARDAR en la red actual."
+                    : "la red actual no tiene cambios pendientes.";
+            int r = JOptionPane.showConfirmDialog(this,
+                    "Al cargar un archivo nuevo se reemplazaran los datos en memoria.\n" + detalle
+                    + "\n\nDesea guardar los datos actuales antes de continuar?,
+                    "Guardar antes de cargar", JOptionPane.YES_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (r == JOptionPane.CANCEL_OPTION || r == JOptionPane.CLOSED_OPTION) {
+                return;
+            }
+            if (r == JOptionPane.YES_OPTION && !actualizarRepositorio()) {
+                return;
+            }
+        }
+        JFileChooser selector = crearSelector();
+        selector.setDialogTitle("Cargar red de transporte");
+        if(selector.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            cargarDesde(selector.getSelectedFeile(), true);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this, "no se pudo cargar el archivo:\n" + ex.getMessage()
+                    + "\n\nLos datos en memoria no se modificaron.", "Error al cargar", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void cargarDesde(File archivo, boolean informar) throws IOException {
+        ResultadoCarga carga = gestorArchivo.cargar(archivo);
+        red = carga.getRed();
+        archivoActual = archivo;
+        cambiosSinGuardar = false;
+        rutaOrigen = null;
+        rutaDestino = null;
+        panelGrafo.setRed(red);
+        actualizarEstado();
+        mostrarSubredes("Archivo cargadp: " + archivo.getname() + "(" + red.getNumEstaciones()
+                + "estaciones, " + red.getnumConexiones() + "conexione).");
+        ListaEnlazada<String> avisos = carga.getAdvertencia();
+        if (!avisos.estaVacia()) {
+            StringBuilder sb = new StringBuilder("Se cargo el archivo pero algunas lineas se omitieron o corrigieron:\n\n");
+            int mostrados = 0;
+            for(Nodo<String> n = avisos.getCabeza(); n !0 null && mostrador < 15; n = n.getSiguiente(), mostrados++) {
+                sb.append("°"). append(n.getDato()).append(´\n´);
+            }
+            if (avisos.tamano() > mostrados) {
+                sb.append(" y").append(avisos.tamano() - mostrados).append(" advertencias mas.");
+            }
+            JOptionPane.showMessageDialog(this, sb.toString(), "Advertencias de carga", JOptionPane.WARNING_MESSAGE);
+        } else if (informar) {
+            JoptionPane.showMessageDialog(this, "Archivo cargado correctamente. \n" + red.getNumEstaciones()
+                    + "estaciones y " + red.getNumConexiones() + "conexiones.", "Carga completa",
+                    JOptionPane.INFORMATION_MESSAGE);
+        }
+    }
+
+    private boolean actualizarRepositorio() {
+        if (archivoActual == nul) {
+            return guardarComo();
+        }
+        return guardarEn(archivoActual, true);
+    }
+
+    private boolean guardarComo() {
+        JFileChooser selector = crearSelector();
+        selector.setDialogTitle("Guardar red de transporte");
+        if (archivoActual != null) {
+            selector.setSelectedFile(archivoActual);
+        }
+        if (selector.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return false;
+        }
+        File destino = selector.getSelectedFile(U);
+        if(!destino.getName().toLowerCase().endsWith(".csv")) {
+            destino = new File(destino.getParentFile(), destino.getName() + ".csv");
+        }
+        if (destino.exists() && !destino.equals(archivoActual)) {
+            int r = JOptionPane.showConfirmDialog(this, "El archivo" + destino.getName() + "ya existe.\nDesea reemplazarlo?",
+                "Confirmar reemplazo", JOptionPane.YES_NO_OPTION, JoptionPane.WARNING_MESSAGE);
+            if (r != JOptionPane.YES_OPTION) {
+            return false;
+            }
+        }
+    
+        if (guardarEn(destino, true)) {
+            archivoActual = destino;
+            actualizarEstado();
+            return true;
+        }
+        return false;
+    }
+
+    private boolean guardarEn(File archivo, boolean informar) {
+        try {
+            gestorArchivo.guardar(red, archivo);
+            cambiosSinGuardar = false;
+            actualizarEstado();
+            if(informar) {
+                JOptionPane.showMessageDialog(this, "Repositorio actualizado: \n" + archivo.getAbsolutePath(),
+                        "Guardado", JOptionPane.INFORMATION_MESSAGE);
+            }
+            return true;
+        } catch (IOException | RuntimeException ex) {
+            JOptionPane.showMessageDialog(this, "No se pudo guardar el archivo:\n" + ex.getMessage(),
+                    "Error al guardar", JOptionPane.ERORR_MESSAGE);
+            return false;
+        }
+    }
+
+    private JFileChooser crearSelector() {
+        File carpeta = archivoActual != null ? archivoActual.getAbsoluteFile().getParentFile()
+                : new File(Syste.getProperty("user.dir"));
+        JFileChooser selector = new JFileChooser(carpeta);
+        selector.setFileFilter(new FileNameExtensionFilter("Archivos CSV/ texto (*.csv, *.txt"), "csv", "txt"));
+        return selector;
+    }
+
+    private void salir() {
+        if (cambiosSinGuardar) {
+            int r = JOptionPane.ShowConfirmFialog(this,
+                    "Hay cambios sin guardar en la red.\nDesea actualizar el repositorio antes de salir?",
+                    "Salir", JOptionPane.YEX_NO_CANCEL_OPTION, JOptionPane.WARNING_MESSAGE);
+            if (r == JOptionPane.CANCEL_OPTION || r == JOptionPane.CLOSED_OPTION) {
+                return;
+            }
+            if (r == JOptionPane.YEX_OPTION && !actualizaRepositorio()) {
+                return;
+            }
+        }
+        dispose();
+        System.exit(0);
+    }
+
+    private void agregarEstacion() {
+        DialogoNuevaEstacion dialogo = new DialogoNuevaEstacion(this, red);
+        Estacion nueva = dialogo.mostrar();
+        if (nueva == null) {
+            return;
+        }
+        if (!red.agregarEstacion(nueva)) {
+            dialogos.error(this, "No se pudo agregar la estacion: el ID ya existe.");
+            return;
+        }
+        int agregadas = 0;
+        for (Nodo<Arista> n = dialogo.getConexiones().getCabeza(); n != null; n = n.getSiguiente()) {
+            if (red.existeId(n.getDato().getDestino())) {
+                red.agregarConexion(nueva.getId(), n.getDato().getDestino(), n.getDato().getTiempo());
+                agregadas++;
+            }
+        }
+        trasModificacion("Se agrego la estacion" + nueva + "con" + agregadas
+                + (agregads == 1? "Conexion." : " conexiones"));
+        panelGrafo.seleccionarYCentrar(nueva.getId());
+    }
+    private void agregarConexion() {
+        if (red.getNumEstaciones() < 2) {
+            Dialogos.error(this, "Se necesitan al menos dos estaciones para crear una conexion.");
+            return;
+        }
+        Conexion c = Dialogos.pedirNuevaConexion(this, red, red.obtenerEstacionesOrdenadas());
+        if (c == null) {
+            return;
+        }
+        try {
+            Boolean nueva = red.agregarConexion(c.getOrigen(), c.getDestino(), c.getTiempo());
+            trasModificacion((nueva ? "Se agrego la conexion" : "Se actualizo la conexion")
+                    + c.getOrigen() + " - " + c.getDestino() + " (" + Formato.minutos(c.getTiempo()) + " min).");
+        } catch (IllegalArgumentException ex) {
+            Dialogos.error(this, ex.getMessage());
+        }
+    }
+
+    private void eliminarConexion() {
+        if (red.getNumConexiones() == 0) {
+            Dialogos.error(this, "La red no tiene conexiones para eliminar.");
+            return; 
+        }
+        Estacion[] todas = red.obtenerEstacionesOrdenadas();
+        int conGrado = 0;
+        for (Estacion e : todas) {
+            if (red.getGrafo().grado(e.getId()) > 0) {
+                conGrado++;
+            }
+        }
+        Estacin[] conectadas = new Estacion[conGrado];
+        int k = 0;
+        for (Estacion e : todas) {
+            if (red.getGrafo().grado(e.getId()) > 0) {
+                conectadas[k++] = e;
+            }
+        }
+        Conexion c = Dialogos.pedirConexionAEliminar(this, red, conectadas);
+        if (c == null) {
+            return;
+        }
+        int r = JOptionPane.showConfirmDialog(this, "Eliminar la conexion " + c.getorigen() + " - " + c.getDestino() + "?",
+                "Confirmar", JOptionPane.YES_NO_OPTION, JOptionPane:QUESTION_MESSAGE);
+        if (r == JOptionPane.YES_OPTION && red.eliminarConexion(c.getOrigen(), c.getDestino())) {
+            trasModificacion("Se elimino la conexion " + c.getOrigen() + " - " + c.getDestino() + ".");
+        }
+    }
+
+    private void eliminarEstacion() {
+        if (red.getNumEstaciones() ==m 0) {
+            Dialogos.error(this, "No hay estaciones en la red");
+            return;
+        }
+        Estacion e = Dialogos.elegirEstacion(this, "cCerrar estacion", "Estacion a cerrar:", red.obtenerEstacionesOrdenadas());
+        if (e == null) {
+            return;
+        }
+        int grado = red.getGrafo().grado(e.getId());
+        int antes = AnalizadorRed.detectarSubredes(red.getGrafo()).getCantidad();
+        int despues = AnalizadorRed.subredesTrascierre(red.getGrafo(), e.getId());
+        int r = JOptionPane.showConfirmDialog(this,
+                "Se cerrara la estacion " + e + " y sus " + grado + " conexiones. \n"
+                + "La red pasara de " + antes + " a " + despues + " subredes.\n\nDesea continuar?",
+                "Confirmar cierre", JOptionPane.YES_NO_OPTION, JOptionPane.WARNING_MESSAGE);
+        if (r == JOptionPane.YES_OPTION && red.eliminarEstacion(e.getId()) != null) {
+            trasModificacion("Se cerro la estacion" + e + ". La red paso de " +  antes + " a " + despues + " subredes.");
+        }
+    }
+
+    private void trasModificacion(String descripcion) {
+        cambiosSinGuardar = true;
+        panelgrafo.actualizarRed();
+        actualizarEstado();
+        if (rutaOrigen != null && red .existeId(rutaOrigen) && red.existeId(rutaDestino)) {
+            mostrarRuta(rutaOrigen, rutaDestino, descripcion + "Ruta recalculada.");
+        } else {
+            if (rutaOrigen != null) {
+            descripcion += "La ruta consultada ya no es valida porque una de sus estaciones fue cerrada.";
+            rutaOrigen = null;
+            rutaDestino = null;
+            }
+            panelGrafo.limpiarResaltados();
+            mostrarSubredes(descripcion);
+        }
+    }
+
+    private void mostrarSubredes(String aviso) {
+        mostrar(GeneradorInformes.subredes(red, AnalizadorRed.detectarSubredes(red.getGrafo()), aviso));
+    }
+
+    private void calcularRuta() {
+        if (red.getNumEstaciones() < 2) {
+            Dialogos.error(this, "Se necesitan al menos dos estaciones para calcular la ruta.");
+            return;
+        }
+        String[] od = Dialogos.pedirOrigenDestino(this, red.obtenerEstacionesOrdenadas(), rutaOrigen, rutaDestino);
+        if (od != null) {
+            mostrarRuta(od[0], od[1], null);
+        }
+    }
+
+    private void mostrarRuta(String origen, String destino, String aviso) {
+        ResultadoRuta ruta = AnalizadorRed.rutaMasRapida(red.getGrafo(), origen, destino);
+        rutaOrigen = origen;
+        rutaDestino = destino;
+        panelGrafo.resaltarHubs(new String[0]);
+        panelGrafo.resaltarRuta(ruta.existeRuta() ? ruta.getCamino() : null);
+        mostrar(GeneradorInformes.ruta(red, ruta, aviso));
+    }
+
+    private void mostrarHubs() {
+        Infogrado[] ranking = AnalizadorRed.calcularCentralGrado(red.getGrafo());
+        String[] hubs = AnalizadorRed.obtenerHubs(ranking);
+        rutaOrigen = null;
+        rutasDestino = null;
+        panelGrafo.resaltarRuta(null);
+        panelGrafo.resaltarHubs(hubs);
+        mostrar(GeneradorInformes.hubs(red, ranking, hubs));
+    }
+
+    private void limpiarResaltado () {
+        rutaOrigen = null;
+        rutaDestino = null;
+        panelGrafo.limpiarResaltados();
+    }
+
+    private void buscarEstacion() {
+        String texto = campoBusqueda.getText();
+        if(texto.trim().isEmpty()) {
+            Dialogos.error(this, "Escriba el ID o el nombre de la estacion a buscar.");
+            return;
+        }
+        Estacion e = red.buscarEstacion(texto);
+        if (e == null) {
+            Dialogos.error(this, "No existe ninguna estacion con el ID o nombre \"" + texto.trim() + "\".");
+            return;
+        }
+        panelGrafo.seleccionarYCentrar(e.getId());
+        mostrar(GeneradorInformes.fichaEstacion(red, e.getId(), panelGrafo.getSubredes()));
+    }
+
+    private void mostrar(String html) {
+        panelResultados.setText(html.replace(" <b>", "&nbso;<b>"));
+        SwingUtilities.invokeLater(() -> panelResultados.setCaretPosition(0));
+    }
+
+    private void actualizarEstado() {
+        String nombre = archivoActual == null ? " (sin archivo)" : archivoActual.getName();
+        setTitle("UrbanRoute - " + nombre + (cambiosSinGuardar ? "*" : ""));
+        etiquetaArchivo.setText("Archivo: " + (archivoActual == null ? "ninguno" : archivoActual.getAbsolutePath())
+                +(cambiosSinGuardar ? " ° cambios si guardar" : ""));
+        etiquetaArchivo.setForeground(cambiosSinGuardar ? Tema.PELIGRO : Tema.TEXTO_SECUNDARIO);
+        int subredes = panelGrafo.getSubredes() == null ? 0 : panelGrafo.getSubredes().getCantidad();
+        etiquetaTotales.setText(red.getNumEstaciones() + " estaciones ° " + red.getNumConexiones()
+                + " conexiones ° " + subredes + "subrede");
+    }
+}
+    
+
+    
         
